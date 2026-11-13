@@ -63,21 +63,27 @@ int main() {
     root.nextFCBid = 1;
 
     Dir *currentDir = &root;
-    char comando[50];
-    char nome[50];
+
+    char linha[200];
 
     while(1){
         printf("/%s:", currentDir->name);
         // Lê as duas palavras separadas por espaço
-        scanf("%49s %49s", comando, nome);
+        if (fgets(linha, sizeof linha, stdin) != NULL) {
 
+             char *comando = strtok(linha, " \t\n");
+             char *nome1   = strtok(NULL, " \t\n");
+             char *nome2   = strtok(NULL, " \t\n");
+
+        if (comando == NULL) {
+            continue;
         // COMANDOS DIRETORIOS
-        if (strcmp(comando, "rmdir") == 0)
+        } else if (strcmp(comando, "rmdir") == 0 && nome1 != NULL)
         {
             // procurar diretorio
             int foundIndex = -1;
             for(int i = 0; i < MAX_SUBDIRS; i++){
-                if(strcmp(currentDir->subdirs[i]->name, nome) == 0){
+                if(strcmp(currentDir->subdirs[i]->name, nome1) == 0){
                     foundIndex = i;
                     break;
                 }
@@ -110,7 +116,7 @@ int main() {
             continue;
         }
 
-        if (strcmp(comando, "mkdir") == 0)
+         else if (strcmp(comando, "mkdir") == 0 && nome1 != NULL)
         {
             if (currentDir->nextDirIndex >= MAX_SUBDIRS)
             {
@@ -120,7 +126,7 @@ int main() {
             }
 
             Dir *newDir = (Dir *)malloc(sizeof(Dir)); // alocação dinâmica de memória
-            strcpy(newDir->name, nome);
+            strcpy(newDir->name, nome1);
             newDir->nextDirIndex = 0;
             newDir->parent = currentDir;
             for (int i = 0; i < MAX_SUBDIRS; i++)
@@ -137,7 +143,7 @@ int main() {
             continue;
         }
 
-        if (strcmp(comando, "ls") == 0)
+         else if (strcmp(comando, "ls") == 0)
         {
             for (int i = 0; i < MAX_SUBDIRS; i++)
             {
@@ -158,9 +164,30 @@ int main() {
             continue;
         }
 
-        if (strcmp(comando, "cd") == 0)
+         else if (strcmp(comando, "mv") == 0 && nome1 != NULL && nome2 != NULL)
+        {          
+            int found = 0;
+            // busca arquivo
+            for (int i = 0; i < MAX_SUBDIRS; i++)
+            {
+
+                if (currentDir->subdirs[i]->name != NULL && strcmp(currentDir->subdirs[i]->name, nome1) == 0)
+                {
+                    strcpy(currentDir->subdirs[i]->name, nome2);
+                    found = 1;
+                    break;
+                }
+            }
+            
+            if (found == 0){
+                    printf("Arquivo não encontrado.\n");
+            }
+            continue;
+        }
+
+         else if (strcmp(comando, "cd") == 0 && nome1 != NULL)
         {
-            if (strcmp(nome, "..") == 0 && currentDir->parent != NULL)
+            if (strcmp(nome1, "..") == 0 && currentDir->parent != NULL)
             {
                 currentDir = currentDir->parent;
             }
@@ -171,7 +198,7 @@ int main() {
                 for (int i = 0; i < MAX_SUBDIRS; i++)
                 {
 
-                    if (currentDir->subdirs[i]->name != NULL && strcmp(currentDir->subdirs[i]->name, nome) == 0)
+                    if (currentDir->subdirs[i]->name != NULL && strcmp(currentDir->subdirs[i]->name, nome1) == 0)
                     {
                         currentDir = currentDir->subdirs[i];
                         found = 1;
@@ -188,11 +215,11 @@ int main() {
         // ======================
 
         // COMANDOS ARQUIVOS
-        if (strcmp(comando, "touch") == 0){
+        else if (strcmp(comando, "touch") == 0 && nome1 != NULL){
             //todo - verificar nome do arquivo
 
             FCB * fcb = (FCB *)(malloc(sizeof(FCB)));
-            strcpy(fcb->name, nome);
+            strcpy(fcb->name, nome1);
             fcb->created = time(NULL);
             fcb->id = currentDir->nextFCBid;
 
@@ -202,13 +229,13 @@ int main() {
             continue;
         }
 
-        if (strcmp(comando, "rm") == 0)
+        else if (strcmp(comando, "rm") == 0 && nome1 != NULL)
         {
             // procurar diretorio
             int foundIndex = -1;
             for (int i = 0; i < MAX_FILES; i++)
             {
-                if (strcmp(currentDir->files[i]->name, nome) == 0)
+                if (strcmp(currentDir->files[i]->name, nome1) == 0)
                 {
                     foundIndex = i;
                     break;
@@ -241,6 +268,10 @@ int main() {
             printf("Arquivo removido \n");
             continue;
         }
+        else {
+
+        }
+    }
     }
 
     return 0;
