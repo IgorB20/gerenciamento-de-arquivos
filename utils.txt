@@ -1,0 +1,12 @@
+
+mv (pasta) (pasta n existente) -> renomeia | OK
+mv (pasta) (pasta existente) -> move | OK
+
+mv (arquivo) (arquivo/pasta n existente) -> renomeia | OK
+mv (arquivo) (arquivo existente) -> exclui o primeiro arquivo e o segundo fica com o conteudo do primeiro
+mv (arquivo) (pasta existente) -> move o arquivo pra pasta
+
+mv (pasta) (arquivo existente) -> erro
+
+pendencias:
+    entender pastas aninhas (p1/p2/p2)
