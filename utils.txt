@@ -3,10 +3,10 @@ mv (pasta) (pasta n existente) -> renomeia | OK
 mv (pasta) (pasta existente) -> move | OK
 
 mv (arquivo) (arquivo/pasta n existente) -> renomeia | OK
-mv (arquivo) (arquivo existente) -> exclui o primeiro arquivo e o segundo fica com o conteudo do primeiro
-mv (arquivo) (pasta existente) -> move o arquivo pra pasta
+mv (arquivo) (arquivo existente) -> exclui o primeiro arquivo e o segundo fica com o conteudo do primeiro | OK
+mv (arquivo) (pasta existente) -> move o arquivo pra pasta | OK
 
-mv (pasta) (arquivo existente) -> erro
+mv (pasta) (arquivo existente) -> erro | OK
 
 pendencias:
-    entender pastas aninhas (p1/p2/p2)
+    entender pastas aninhadas (p1/p2/p2)

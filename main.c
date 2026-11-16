@@ -200,7 +200,7 @@ int main() {
             int foundFileIndex1 = -1;
 
             if (foundIndex1 == -1)
-                foundFileIndex1 = findFile(nome1, currentDir);
+                foundFileIndex1 = findFile(nome1, currentDir); //busca primeiro arquivo
             
             if( foundIndex1 == -1 && foundFileIndex1 == -1){
                 printf("Diretório/arquivo não encontrado.\n");
@@ -212,9 +212,9 @@ int main() {
             int foundFileIndex2 = -1;
             
             if (foundIndex2 == -1)
-                foundFileIndex2 = findFile(nome2, currentDir);
+                foundFileIndex2 = findFile(nome2, currentDir); //busca segundo arquivo
 
-            if(foundIndex2 == -1 && foundFileIndex2 == -1)
+            if(foundIndex2 == -1 && foundFileIndex2 == -1) //renomear arquivo/diretorio
             {
                 if(foundIndex1 > -1)  // renomear diretorio
                     strcpy(currentDir->subdirs[foundIndex1]->name, nome2);
@@ -224,7 +224,7 @@ int main() {
                     
             }
 
-            if (foundIndex2 > -1) //mover
+            if (foundIndex1 > -1 && foundIndex2 > -1) //mover pasta pra dentro de pasta
             {
                 //mover pasta nome1 pra dentro de nome2
                 Dir *dirToMove = currentDir->subdirs[foundIndex1];
@@ -256,6 +256,57 @@ int main() {
                 currentDir->nextDirIndex--;
             }
 
+            if(foundFileIndex1 > -1 && foundIndex2 > -1) //mover arquivo pra dentro de pasta
+            {   
+                Dir * dirToReceive = currentDir->subdirs[foundIndex2];
+                FCB *fileToMove = currentDir->files[foundFileIndex1];
+
+                if (dirToReceive->nextDirIndex >= MAX_SUBDIRS)
+                {
+                    printf("Diretório cheio.\n");
+                    continue;
+                }
+
+                fileToMove->id = dirToReceive->nextFCBid;
+                dirToReceive->files[dirToReceive->nextFCBIndex] = fileToMove;
+                currentDir->files[foundFileIndex1] = NULL;
+
+                dirToReceive->nextFCBIndex++;
+                dirToReceive->nextFCBid++;
+                currentDir->nextFCBIndex--;
+
+            }
+
+            if(foundFileIndex1 > -1 && foundFileIndex2 > -1){// substituir um arquivo pelo outro
+                FCB *file1 = currentDir->files[foundFileIndex1];
+
+                free(currentDir->files[foundFileIndex2]);
+
+                strcpy(file1->name, nome2);
+                currentDir->files[foundFileIndex2] = file1; // file2 passa a apontar pro mesmo endereco que file1
+                currentDir->files[foundFileIndex1] = NULL;
+
+                if (foundFileIndex1 < MAX_FILES - 1)
+                {
+                    // todos os indices depois do file encontrado tem que andar 1 pra tras.
+                    for (int i = foundFileIndex1 + 1; i < MAX_FILES; i++)
+                    {
+                        if (currentDir->files[i] == NULL)
+                            break;
+
+                        currentDir->files[i - 1] = currentDir->files[i];
+                        currentDir->files[i] = NULL;
+                    }
+                }
+
+                currentDir->nextFCBIndex--;
+            }
+
+            if (foundIndex1 > -1 && foundFileIndex2 > -1) // mv (pasta) (arquivo existente) -> erro
+            {
+                printf("Not a directory.\n");
+            }
+            
             continue;
         }
 
@@ -335,9 +386,7 @@ int main() {
             printf("Arquivo removido \n");
             continue;
         }
-        else {
-
-        }
+   
     }
     }
 
