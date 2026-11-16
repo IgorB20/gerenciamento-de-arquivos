@@ -1,4 +1,9 @@
 
+pendencias:
+    entender pastas aninhadas (p1/p2/p2)
+
+---
+
 mv (pasta) (pasta n existente) -> renomeia | OK
 mv (pasta) (pasta existente) -> move | OK
 
@@ -8,17 +13,15 @@ mv (arquivo) (pasta existente) -> move o arquivo pra pasta | OK
 
 mv (pasta) (arquivo existente) -> erro | OK
 
-pendencias:
-    entender pastas aninhadas (p1/p2/p2)
-
 ---
 
-cp (arquivo) (arquivo n existente) -> criar copia do arquivo com nome do arquivo2
-cp (arquivo) (arquivo existente) -> arquivo 2 vira copia do arquivo 1
+cp (arquivo) (arquivo n existente) -> criar copia do arquivo com nome do arquivo2 OK
+cp (arquivo) (arquivo existente) -> arquivo 2 vira copia do arquivo 1 OK
 
-cp (arquivo) (pasta) -> copia arquivo pra dentro da pasta
+cp (arquivo) (pasta) -> copia arquivo pra dentro da pasta OK
 
-cp (pasta) (arquivo) -> erro
+cp (pasta) (arquivo) -> erro OK
+cp (pasta) (pasta) -> erro OK
 
 ---
 

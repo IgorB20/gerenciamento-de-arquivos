@@ -94,8 +94,10 @@ int main() {
         root.files[i] = NULL;
     }
     root.nextDirIndex = 0;
+    root.nextFCBIndex = 0;
     root.nextFCBid = 1;
-
+    
+    
     Dir *currentDir = &root;
 
     char linha[200];
@@ -185,7 +187,7 @@ int main() {
             {
                 if (currentDir->files[i] != NULL)
                 {
-                    printf("%s ", currentDir->files[i]->name);
+                    printf("%s (%d) ", currentDir->files[i]->name, currentDir->files[i]->id);
                 }
             }
             printf("\n");
@@ -331,7 +333,72 @@ int main() {
             continue;
         }
         // ======================
+        else if (strcmp(comando, "cp") == 0 && nome1 != NULL && nome2 != NULL)
+        {
+            if (currentDir->nextFCBIndex >= MAX_FILES) // olha apenas no diretorio atual - ToDo: considerar repositorios aninhados 
+            {
+                printf("Diretório cheio. ");
+                printf("Limite de %d arquivos atingido.\n", MAX_FILES);
+                continue;
+            }
 
+            int foundIndex = findFile(nome1, currentDir);
+            if (foundIndex == -1){
+                printf("Arquivo não encontrado.\n");
+                continue;
+            }
+            
+            int foundIndex2 = findFile(nome2, currentDir);
+            int foundDirIndex = findDir(nome2, currentDir);
+
+            if (foundIndex2 == -1 && foundDirIndex == -1) // cp (arquivo) (arquivo n existente) -> criar copia do arquivo com nome do arquivo2
+            { 
+                if(currentDir->nextFCBIndex >= MAX_FILES){
+                    printf("Diretório cheio!");
+                    continue;
+                }
+
+                //cria arquivo cópia
+                FCB *copyFile = malloc((sizeof(FCB)));
+                *copyFile = *currentDir->files[foundIndex];
+                strcpy(copyFile->name, nome2);
+                copyFile->id = currentDir->nextFCBid++;
+
+                //adiciona arquivo cópia no diretorio atual
+                currentDir->files[currentDir->nextFCBIndex++] = copyFile;
+            }
+
+            if (foundIndex2 == 1) // cp (arquivo) (arquivo existente) -> arquivo 2 vira copia do arquivo1, nomes se mantem
+            {
+                free(currentDir->files[foundIndex2]);
+                
+                FCB *copyFile = malloc((sizeof(FCB)));
+                *copyFile = *currentDir->files[foundIndex];
+                strcpy(copyFile->name, nome2);
+                copyFile->id = currentDir->nextFCBid++;
+
+                // adiciona arquivo cópia no diretorio atual e no mesmo index do arquivo2 original
+                currentDir->files[foundIndex2] = copyFile;
+            }
+
+            if (foundDirIndex > -1) // cp (arquivo) (pasta) -> copia arquivo pra dentro da pasta
+            {
+                Dir *destDir = currentDir->subdirs[foundDirIndex];
+
+                if(destDir->nextFCBIndex >= MAX_FILES){
+                    printf("Diretório cheio!");
+                    continue;
+                }
+
+                FCB *copyFile = malloc((sizeof(FCB)));
+                *copyFile = *currentDir->files[foundIndex];
+                copyFile->id = destDir->nextFCBid++;
+
+                currentDir->subdirs[foundDirIndex]->files[destDir->nextFCBIndex++] = copyFile;
+            }
+
+            continue;
+        }
         // COMANDOS ARQUIVOS
         else if (strcmp(comando, "touch") == 0 && nome1 != NULL){
             //todo - verificar nome do arquivo
