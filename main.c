@@ -95,7 +95,8 @@ int main() {
     }
     root.nextDirIndex = 0;
     root.nextFCBid = 1;
-
+    root.nextFCBIndex = 1;
+    
     Dir *currentDir = &root;
 
     char linha[200];
@@ -331,7 +332,39 @@ int main() {
             continue;
         }
         // ======================
+        else if (strcmp(comando, "cp") == 0 && nome1 != NULL && nome2 != NULL)
+        {
+            if (currentDir->nextFCBIndex >= MAX_FILES)
+            {
+                printf("Diretório cheio. ");
+                printf("Limite de %d arquivos atingido.\n", MAX_FILES);
+                continue;
+            }
 
+            int foundIndex = findFile(nome1, currentDir);
+
+            int foundIndex2 = findFile(nome2, currentDir);
+
+            if(foundIndex == -1 || foundIndex2 != -1){
+                continue;
+            }
+
+            FCB *copyFile = malloc(sizeof *copyFile);
+
+            if(copyFile == NULL){
+                continue;
+            }
+
+            *copyFile = *currentDir->files[foundIndex];
+
+            strcpy(copyFile->name, nome2);
+
+            copyFile->id = currentDir->nextFCBid++;
+
+            currentDir->files[currentDir->nextFCBIndex++] = copyFile;
+
+            continue;
+        }
         // COMANDOS ARQUIVOS
         else if (strcmp(comando, "touch") == 0 && nome1 != NULL){
             //todo - verificar nome do arquivo
