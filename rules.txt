@@ -1,6 +1,7 @@
 
 pendencias:
-    entender pastas aninhadas (p1/p2/p2)
+    - entender pastas aninhadas (p1/p2/p2)
+    - comando echo nao aceita string (apenas numeros ou caracteres sem espacos, ex: 111, aabbd, palavra)
 
 ---
 
@@ -25,5 +26,13 @@ cp (pasta) (pasta) -> erro OK
 
 ---
 
-echo "file content" > (arquivo) -> sobrescreve conteudo do arquivo pelo conteudo fornecido
-echo "content" > (pasta) -> erro
+cat (arquivo) -> visualiza arquivo OK
+cat (pasta) -> erro OK
+
+
+---
+
+echo "file content" > (arquivo) -> sobrescreve conteudo do arquivo pelo conteudo fornecido OK
+echo "file content" > (arquivo n existente) -> cria arquivo com conteudo fornecido e nome passado OK
+echo "content" > (pasta) -> erro OK
+

@@ -7,7 +7,7 @@
     3.1. Modelagem da Estrutura de Diretórios
     3.2. Representação e Gerenciamento de Arquivos e Metadados
     Criar uma estrutura struct em C para representar um File Control
-Block (FCB) para cada arquivo. Este FCB deve armazenar atributos
+Block (File) para cada arquivo. Este File deve armazenar atributos
 como: nome (string), tamanho (inteiro), tipo (enum ou inteiro para
 dados: numérico, caractere, binário; programa), data de
 criação/modificação/acesso (time_t), um ID único (simulando um
@@ -24,24 +24,27 @@ arquivos real
 #define MAX_SUBDIRS 5
 #define MAX_FILES 50
 
-typedef struct FCB
+typedef struct File
 {
     int id;
     char name[20];
     //int tamanho; // bytes
+    char content[200];
 
     time_t created;
+    time_t modified;
+    time_t accessed;
 
-} FCB;
+} File;
 
 typedef struct Dir
 {
     char name[10];
     struct Dir *subdirs[MAX_SUBDIRS];
-    struct FCB *files[MAX_FILES];
+    struct File *files[MAX_FILES];
     int nextDirIndex;
-    int nextFCBIndex;
-    int nextFCBid;
+    int nextFileIndex;
+    int nextFileid;
     struct Dir *parent;
 } Dir;
 
@@ -80,6 +83,23 @@ int findFile(char name [10], Dir *dir)
     return foundIndex;
 }
 
+File * createFile(char name [10], Dir *dir){
+    File *file = (File *)(malloc(sizeof(File)));
+    strcpy(file->name, name);
+    strcpy(file->content, "teste conteudo");
+    file->created = time(NULL);
+    file->modified = time(NULL);
+    file->accessed = time(NULL);
+    file->id = dir->nextFileid++;
+
+    return file;
+}
+
+void addFileToDir(File * file, Dir * dir){
+    dir->files[dir->nextFileIndex] = file;
+    dir->nextFileIndex++;
+}
+
 int main() {
     Dir root;
     strcpy(root.name, "root");
@@ -94,8 +114,8 @@ int main() {
         root.files[i] = NULL;
     }
     root.nextDirIndex = 0;
-    root.nextFCBIndex = 0;
-    root.nextFCBid = 1;
+    root.nextFileIndex = 0;
+    root.nextFileid = 1;
     
     
     Dir *currentDir = &root;
@@ -108,13 +128,16 @@ int main() {
         if (fgets(linha, sizeof linha, stdin) != NULL) {
 
              char *comando = strtok(linha, " \t\n");
-             char *nome1   = strtok(NULL, " \t\n");
-             char *nome2   = strtok(NULL, " \t\n");
+             char *nome1 = strtok(NULL, " \t\n");
+             char *nome2 = strtok(NULL, " \t\n");
+             char *nome3 = strtok(NULL, " \t\n");
+             char *nome4 = strtok(NULL, " \t\n");
 
-        if (comando == NULL) {
-            continue;
-        // COMANDOS DIRETORIOS
-        } else if (strcmp(comando, "rmdir") == 0 && nome1 != NULL)
+             if (comando == NULL)
+             {
+                 continue;
+                 // COMANDOS DIRETORIOS
+             } else if (strcmp(comando, "rmdir") == 0 && nome1 != NULL)
         {
             // procurar diretorio
             int foundIndex = findDir(nome1, currentDir);
@@ -261,7 +284,7 @@ int main() {
             if(foundFileIndex1 > -1 && foundIndex2 > -1) //mover arquivo pra dentro de pasta
             {   
                 Dir * dirToReceive = currentDir->subdirs[foundIndex2];
-                FCB *fileToMove = currentDir->files[foundFileIndex1];
+                File *fileToMove = currentDir->files[foundFileIndex1];
 
                 if (dirToReceive->nextDirIndex >= MAX_SUBDIRS)
                 {
@@ -269,18 +292,18 @@ int main() {
                     continue;
                 }
 
-                fileToMove->id = dirToReceive->nextFCBid;
-                dirToReceive->files[dirToReceive->nextFCBIndex] = fileToMove;
+                fileToMove->id = dirToReceive->nextFileid;
+                dirToReceive->files[dirToReceive->nextFileIndex] = fileToMove;
                 currentDir->files[foundFileIndex1] = NULL;
 
-                dirToReceive->nextFCBIndex++;
-                dirToReceive->nextFCBid++;
-                currentDir->nextFCBIndex--;
+                dirToReceive->nextFileIndex++;
+                dirToReceive->nextFileid++;
+                currentDir->nextFileIndex--;
 
             }
 
             if(foundFileIndex1 > -1 && foundFileIndex2 > -1){// substituir um arquivo pelo outro
-                FCB *file1 = currentDir->files[foundFileIndex1];
+                File *file1 = currentDir->files[foundFileIndex1];
 
                 free(currentDir->files[foundFileIndex2]);
 
@@ -301,7 +324,7 @@ int main() {
                     }
                 }
 
-                currentDir->nextFCBIndex--;
+                currentDir->nextFileIndex--;
             }
 
             if (foundIndex1 > -1 && foundFileIndex2 > -1) // mv (pasta) (arquivo existente) -> erro
@@ -335,7 +358,7 @@ int main() {
         // ======================
         else if (strcmp(comando, "cp") == 0 && nome1 != NULL && nome2 != NULL)
         {
-            if (currentDir->nextFCBIndex >= MAX_FILES) // olha apenas no diretorio atual - ToDo: considerar repositorios aninhados 
+            if (currentDir->nextFileIndex >= MAX_FILES) // olha apenas no diretorio atual - ToDo: considerar repositorios aninhados 
             {
                 printf("Diretório cheio. ");
                 printf("Limite de %d arquivos atingido.\n", MAX_FILES);
@@ -353,29 +376,29 @@ int main() {
 
             if (foundIndex2 == -1 && foundDirIndex == -1) // cp (arquivo) (arquivo n existente) -> criar copia do arquivo com nome do arquivo2
             { 
-                if(currentDir->nextFCBIndex >= MAX_FILES){
-                    printf("Diretório cheio!");
+                if(currentDir->nextFileIndex >= MAX_FILES){
+                    printf("Diretório cheio!\n");
                     continue;
                 }
 
                 //cria arquivo cópia
-                FCB *copyFile = malloc((sizeof(FCB)));
+                File *copyFile = malloc((sizeof(File)));
                 *copyFile = *currentDir->files[foundIndex];
                 strcpy(copyFile->name, nome2);
-                copyFile->id = currentDir->nextFCBid++;
+                copyFile->id = currentDir->nextFileid++;
 
                 //adiciona arquivo cópia no diretorio atual
-                currentDir->files[currentDir->nextFCBIndex++] = copyFile;
+                currentDir->files[currentDir->nextFileIndex++] = copyFile;
             }
 
             if (foundIndex2 == 1) // cp (arquivo) (arquivo existente) -> arquivo 2 vira copia do arquivo1, nomes se mantem
             {
                 free(currentDir->files[foundIndex2]);
                 
-                FCB *copyFile = malloc((sizeof(FCB)));
+                File *copyFile = malloc((sizeof(File)));
                 *copyFile = *currentDir->files[foundIndex];
                 strcpy(copyFile->name, nome2);
-                copyFile->id = currentDir->nextFCBid++;
+                copyFile->id = currentDir->nextFileid++;
 
                 // adiciona arquivo cópia no diretorio atual e no mesmo index do arquivo2 original
                 currentDir->files[foundIndex2] = copyFile;
@@ -385,32 +408,32 @@ int main() {
             {
                 Dir *destDir = currentDir->subdirs[foundDirIndex];
 
-                if(destDir->nextFCBIndex >= MAX_FILES){
+                if(destDir->nextFileIndex >= MAX_FILES){
                     printf("Diretório cheio!");
                     continue;
                 }
 
-                FCB *copyFile = malloc((sizeof(FCB)));
+                File *copyFile = malloc((sizeof(File)));
                 *copyFile = *currentDir->files[foundIndex];
-                copyFile->id = destDir->nextFCBid++;
+                copyFile->id = destDir->nextFileid++;
 
-                currentDir->subdirs[foundDirIndex]->files[destDir->nextFCBIndex++] = copyFile;
+                currentDir->subdirs[foundDirIndex]->files[destDir->nextFileIndex++] = copyFile;
             }
 
             continue;
         }
         // COMANDOS ARQUIVOS
         else if (strcmp(comando, "touch") == 0 && nome1 != NULL){
-            //todo - verificar nome do arquivo
+            
+            int foundIndex = findFile(nome1, currentDir);
 
-            FCB * fcb = (FCB *)(malloc(sizeof(FCB)));
-            strcpy(fcb->name, nome1);
-            fcb->created = time(NULL);
-            fcb->id = currentDir->nextFCBid;
+            if(foundIndex > -1){
+                printf("Arquivo com mesmo nome já existe\n");
+                continue;
+            }
 
-            currentDir->files[currentDir->nextFCBIndex] = fcb;
-            currentDir->nextFCBIndex++;
-            currentDir->nextFCBid++;
+            File * file = createFile(nome1, currentDir);
+            addFileToDir(file, currentDir);
             continue;
         }
 
@@ -449,13 +472,79 @@ int main() {
                 }
             }
 
-            currentDir->nextFCBIndex--;
-            printf("Arquivo removido \n");
+            currentDir->nextFileIndex--;
             continue;
         }
-   
-    }
-    }
+        else if (strcmp(comando, "cat") == 0 && nome1 != NULL){
+            // ler arquivo
+            int foundIndex = findFile(nome1, currentDir);
+            
+            if(foundIndex == -1){
+                printf("Arquivo não encontrado\n");
+                continue;
+            }
+
+            File * file = currentDir->files[foundIndex];
+
+            printf("%s\n", file->content);
+
+            file->accessed = time(NULL);
+
+            continue;
+        }
+        else if (strcmp(comando, "echo") == 0 && nome1 != NULL && nome2 != NULL && nome3 != NULL)
+        {
+            
+            if (strcmp(nome2, ">") != 0)
+            {
+                printf("Utilize o padrao: echo content > arquivo.txt\n");
+                continue;
+            }
+
+
+            int foundFileIndex = findFile(nome3, currentDir);
+            int foundDirIndex = findDir(nome3, currentDir);
+
+            if(foundFileIndex == -1 && foundDirIndex > -1){
+                printf("Erro: %s é um diretorio\n", nome3);
+                continue;
+            }
+
+            if (foundFileIndex > -1) // echo "file content" > (arquivo) -> sobrescreve conteudo do arquivo pelo conteudo fornecido
+            {
+                strcpy(currentDir->files[foundFileIndex]->content, nome1);
+                currentDir->files[foundFileIndex]->modified = time(NULL);
+            }
+
+            if (foundFileIndex == -1 && foundDirIndex == -1) // cria arquivo com conteudo fornecido e nome passado
+            {
+                File *file = createFile(nome3, currentDir);
+                strcpy(file->content, nome1);
+                addFileToDir(file, currentDir);
+            }
+
+            continue;
+        }
+        else if (strcmp(comando, "stat") == 0 && nome1 != NULL)
+        {
+            int foundIndex = findFile(nome1, currentDir);
+
+            if(foundIndex == -1){
+                printf("Arquivo nao encontrado\n");
+                continue;
+            }   
+
+            File * file = currentDir->files[foundIndex];
+
+            printf("Name: %s\n", file->name);
+            printf("Created: %s", ctime(&file->created));
+            printf("Modified: %s", ctime(&file->modified));
+            printf("Accessed: %s", ctime(&file->accessed));
+
+            continue;
+        }
 
     return 0;
+    }
+}
 }
