@@ -23,6 +23,7 @@ arquivos real
 
 #define MAX_SUBDIRS 5
 #define MAX_FILES 50
+#define MAX_BLOCKS_PER_FILE 50
 
 typedef struct File
 {
@@ -30,6 +31,9 @@ typedef struct File
     char name[20];
     //int tamanho; // bytes
     char content[200];
+    int size;
+    int blockCount;
+    int blockIndices[MAX_BLOCKS_PER_FILE];
 
     time_t created;
     time_t modified;
@@ -85,8 +89,12 @@ int findFile(char name [10], Dir *dir)
 
 File * createFile(char name [10], Dir *dir){
     File *file = (File *)(malloc(sizeof(File)));
+    if (file == NULL)
+        return NULL;
     strcpy(file->name, name);
-    strcpy(file->content, "teste conteudo");
+    file->content[0] = '\0';
+    file->size = 0;
+    file->blockCount = 0;
     file->created = time(NULL);
     file->modified = time(NULL);
     file->accessed = time(NULL);
@@ -424,6 +432,16 @@ int main() {
         }
         // COMANDOS ARQUIVOS
         else if (strcmp(comando, "touch") == 0 && nome1 != NULL){
+
+            if (strlen(nome1) >= sizeof(((File *)0)->name)) {
+                printf("Nome do arquivo muito longo.\n");
+                continue;
+            }
+
+            if (currentDir->nextFileIndex >= MAX_FILES) {
+                printf("Diretório cheio.\n");
+                continue;
+            }
             
             int foundIndex = findFile(nome1, currentDir);
 
@@ -433,6 +451,10 @@ int main() {
             }
 
             File * file = createFile(nome1, currentDir);
+            if (file == NULL) {
+                printf("Não foi possível criar o arquivo.\n");
+                continue;
+            }
             addFileToDir(file, currentDir);
             continue;
         }
