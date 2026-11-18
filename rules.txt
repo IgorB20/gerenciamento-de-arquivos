@@ -2,6 +2,7 @@
 pendencias:
     - entender pastas aninhadas (p1/p2/p2)
     - comando echo nao aceita string (apenas numeros ou caracteres sem espacos, ex: 111, aabbd, palavra)
+    - armazenar tamanho do arquivo
 
 ---
 
@@ -36,3 +37,46 @@ echo "file content" > (arquivo) -> sobrescreve conteudo do arquivo pelo conteudo
 echo "file content" > (arquivo n existente) -> cria arquivo com conteudo fornecido e nome passado OK
 echo "content" > (pasta) -> erro OK
 
+
+---
+
+permissoes
+
+chmod n1n2n3 (arquivo)
+
+n1 -> permissoes do user
+n2 -> permissoes do grupo
+n3 -> permissoes de outros
+
+r = 4 (read)
+w = 2 (write)
+x = 1 (execute)
+
+chmod 400 arquivo -> permissao de leitura no arquivo para (user)
+chmod 040 arquivo -> permissao de leitura no arquivo para (grupo)
+chmod 004 arquivo -> permissao de leitura no arquivo para (outros)
+
+soma
+chmod 600 arquivo -> permissao de leitura E escrita (4 + 2) no arquivo para (user)
+
+
+leitura de arquivo    
+    cat OK
+    cp  OK
+
+escrita de arquivo 
+    echo OK
+
+execucao de arquivo ?
+    TO DO
+
+leitura de diretorio
+    ls OK
+
+escrita de diretorio
+    touch OK
+    rm OK
+    mkdir OK
+    rmdir OK
+
+ 
