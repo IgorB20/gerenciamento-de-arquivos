@@ -24,6 +24,11 @@ arquivos real
 #define MAX_SUBDIRS 5
 #define MAX_FILES 50
 #define MAX_BLOCKS_PER_FILE 50
+#define TOTAL_BLOCKS 4
+#define BLOCK_SIZE 4
+
+char blocks[TOTAL_BLOCKS][BLOCK_SIZE];
+int blockUsed[TOTAL_BLOCKS] = {0};
 
 typedef struct File
 {
@@ -516,34 +521,103 @@ int main() {
         }
         else if (strcmp(comando, "echo") == 0 && nome1 != NULL && nome2 != NULL && nome3 != NULL)
         {
-            
             if (strcmp(nome2, ">") != 0)
             {
                 printf("Utilize o padrao: echo content > arquivo.txt\n");
                 continue;
             }
 
+            if (strlen(nome3) >= sizeof(((File *)0)->name))
+            {
+                printf("Nome do arquivo muito longo.\n");
+                continue;
+            }
 
             int foundFileIndex = findFile(nome3, currentDir);
             int foundDirIndex = findDir(nome3, currentDir);
 
-            if(foundFileIndex == -1 && foundDirIndex > -1){
+            if (foundFileIndex == -1 && foundDirIndex > -1)
+            {
                 printf("Erro: %s é um diretorio\n", nome3);
                 continue;
             }
 
-            if (foundFileIndex > -1) // echo "file content" > (arquivo) -> sobrescreve conteudo do arquivo pelo conteudo fornecido
+            File *file = NULL;
+            if (foundFileIndex >= 0)
             {
-                strcpy(currentDir->files[foundFileIndex]->content, nome1);
-                currentDir->files[foundFileIndex]->modified = time(NULL);
+                file = currentDir->files[foundFileIndex];
             }
 
-            if (foundFileIndex == -1 && foundDirIndex == -1) // cria arquivo com conteudo fornecido e nome passado
+            /* Os blocos atuais do arquivo poderão ser reutilizados. */
+            int available = file != NULL ? file->blockCount : 0;
+            for (int i = 0; i < TOTAL_BLOCKS; i++) {
+                if (blockUsed[i] == 0)
+                    available++;
+            }
+
+            int size = (int)strlen(nome1);
+            int needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+            if (needed > MAX_BLOCKS_PER_FILE ||
+                size >= sizeof(((File *)0)->content))
             {
-                File *file = createFile(nome3, currentDir);
-                strcpy(file->content, nome1);
+                printf("Conteúdo grande demais.\n");
+                continue;
+            }
+
+            if (available < needed)
+            {
+                printf("Espaço insuficiente nos blocos.\n");
+                continue;
+            }
+
+            /* Se for arquivo novo, verifica capacidade antes de criá-lo. */
+            if (file == NULL)
+            {
+                if (currentDir->nextFileIndex >= MAX_FILES)
+                {
+                    printf("Diretório cheio.\n");
+                    continue;
+                }
+
+                file = createFile(nome3, currentDir);
+                if (file == NULL)
+                {
+                    printf("Não foi possível criar o arquivo.\n");
+                    continue;
+                }
                 addFileToDir(file, currentDir);
             }
+
+            /* Libera os blocos antigos para reutilizá-los na nova gravação. */
+            for (int i = 0; i < file->blockCount; i++)
+            {
+                blockUsed[file->blockIndices[i]] = 0;
+            }
+            file->blockCount = 0;
+
+            /* Reserva blocos e grava neles partes do conteúdo. */
+            for (int i = 0; i < TOTAL_BLOCKS && file->blockCount < needed; i++)
+            {
+                if (blockUsed[i] == 0)
+                {
+                    int offset = file->blockCount * BLOCK_SIZE;
+                    int bytes = size - offset;
+
+                    if (bytes > BLOCK_SIZE)
+                        bytes = BLOCK_SIZE;
+
+                    memcpy(blocks[i], nome1 + offset, bytes);
+                    blockUsed[i] = 1;
+                    file->blockIndices[file->blockCount] = i;
+                    file->blockCount++;
+                }
+            }
+
+            /* Atualiza os dados do arquivo após concluir a alocação. */
+            strcpy(file->content, nome1);
+            file->size = size;
+            file->modified = time(NULL);
 
             continue;
         }
