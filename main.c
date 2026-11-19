@@ -459,24 +459,16 @@ int main() {
         // ======================
         else if (strcmp(comando, "cp") == 0 && nome1 != NULL && nome2 != NULL)
         {
-            if (currentDir->nextFileIndex >= MAX_FILES) // olha apenas no diretorio atual - ToDo: considerar repositorios aninhados 
-            {
-                printf("Diretório cheio. ");
-                printf("Limite de %d arquivos atingido.\n", MAX_FILES);
-                continue;
-            }
-
             int foundIndex = findFile(nome1, currentDir);
-            if (foundIndex == -1){
+            if (foundIndex == -1)
+            {
                 printf("Arquivo não encontrado.\n");
                 continue;
             }
 
-            //permissoes
             File *file1 = currentDir->files[foundIndex];
             int permission = file1->permissions[CURRENT_USER];
-
-            if (hasReadPermission(permission) == 0)
+            if (!hasReadPermission(permission))
             {
                 printf("User %d: Permissao negada.\n", CURRENT_USER);
                 continue;
@@ -485,59 +477,114 @@ int main() {
             int foundIndex2 = findFile(nome2, currentDir);
             int foundDirIndex = findDir(nome2, currentDir);
 
-            if (foundIndex2 == -1 && foundDirIndex == -1) // cp (arquivo) (arquivo n existente) -> criar copia do arquivo com nome do arquivo2
-            { 
-                if(currentDir->nextFileIndex >= MAX_FILES){
-                    printf("Diretório cheio!\n");
-                    continue;
-                }
+            Dir *destDir = currentDir;
+            const char *copyName = nome2;
+            int replaceIndex = -1;
 
-                //cria arquivo cópia
-                File *copyFile = malloc((sizeof(File)));
-                *copyFile = *currentDir->files[foundIndex];
-                strcpy(copyFile->name, nome2);
-                copyFile->id = currentDir->nextFileid++;
-
-                //adiciona arquivo cópia no diretorio atual
-                currentDir->files[currentDir->nextFileIndex++] = copyFile;
-            }
-
-            if (foundIndex2 == 1) // cp (arquivo) (arquivo existente) -> arquivo 2 vira copia do arquivo1, nomes se mantem
+            if (foundDirIndex >= 0)
             {
-                File *file2 = currentDir->files[foundIndex2];
-                int permission = file2->permissions[CURRENT_USER];
-
-                if (hasReadPermission(permission) == 0)
+                destDir = currentDir->subdirs[foundDirIndex];
+                copyName = file1->name;
+                if (findFile((char *)copyName, destDir) >= 0)
                 {
-                    printf("User %d: Permissao negada.\n", CURRENT_USER);
+                    printf("Já existe um arquivo com esse nome no diretório de destino.\n");
+                    continue;
+                }
+            }
+            else if (foundIndex2 >= 0)
+            {
+                if (foundIndex2 == foundIndex)
+                {
+                    printf("Origem e destino são o mesmo arquivo.\n");
                     continue;
                 }
 
-                free(currentDir->files[foundIndex2]);
-                
-                File *copyFile = malloc((sizeof(File)));
-                *copyFile = *currentDir->files[foundIndex];
-                strcpy(copyFile->name, nome2);
-                copyFile->id = currentDir->nextFileid++;
-
-                // adiciona arquivo cópia no diretorio atual e no mesmo index do arquivo2 original
-                currentDir->files[foundIndex2] = copyFile;
+                File *destinationFile = currentDir->files[foundIndex2];
+                if (!hasWritePermission(destinationFile->permissions[CURRENT_USER]))
+                {
+                    printf("Sem permissão para substituir o arquivo de destino.\n");
+                    continue;
+                }
+                replaceIndex = foundIndex2;
             }
 
-            if (foundDirIndex > -1) // cp (arquivo) (pasta) -> copia arquivo pra dentro da pasta
+            if (!hasWritePermission(destDir->permissions[CURRENT_USER]))
             {
-                Dir *destDir = currentDir->subdirs[foundDirIndex];
+                printf("Sem permissão de escrita no diretório de destino.\n");
+                continue;
+            }
 
-                if(destDir->nextFileIndex >= MAX_FILES){
-                    printf("Diretório cheio!");
-                    continue;
+            if (strlen(copyName) >= sizeof(file1->name))
+            {
+                printf("Nome do arquivo muito longo.\n");
+                continue;
+            }
+
+            if (replaceIndex == -1 && destDir->nextFileIndex >= MAX_FILES)
+            {
+                printf("Diretório cheio.\n");
+                continue;
+            }
+
+            int availableBlocks = 0;
+            for (int i = 0; i < TOTAL_BLOCKS; i++)
+            {
+                if (!blockUsed[i])
+                    availableBlocks++;
+            }
+            if (replaceIndex >= 0)
+            {
+                File *oldDestination = currentDir->files[replaceIndex];
+                availableBlocks += oldDestination->blockCount;
+            }
+
+            if (availableBlocks < file1->blockCount)
+            {
+                printf("Espaço insuficiente nos blocos para uma cópia independente.\n");
+                continue;
+            }
+
+            File *copyFile = malloc(sizeof *copyFile);
+            if (copyFile == NULL)
+            {
+                printf("Não foi possível alocar memória para a cópia.\n");
+                continue;
+            }
+
+            *copyFile = *file1;
+            strcpy(copyFile->name, copyName);
+            copyFile->id = destDir->nextFileid++;
+            copyFile->blockCount = 0;
+
+            /* Ao substituir, libera os blocos do destino somente após validar a cópia. */
+            if (replaceIndex >= 0)
+            {
+                File *oldDestination = currentDir->files[replaceIndex];
+                for (int i = 0; i < oldDestination->blockCount; i++)
+                    blockUsed[oldDestination->blockIndices[i]] = 0;
+                free(oldDestination);
+            }
+
+            /* Reserva blocos diferentes dos usados pelo arquivo original. */
+            for (int i = 0; i < TOTAL_BLOCKS && copyFile->blockCount < file1->blockCount; i++)
+            {
+                if (!blockUsed[i])
+                {
+                    int sourceBlock = file1->blockIndices[copyFile->blockCount];
+                    memcpy(blocks[i], blocks[sourceBlock], BLOCK_SIZE);
+                    blockUsed[i] = 1;
+                    copyFile->blockIndices[copyFile->blockCount] = i;
+                    copyFile->blockCount++;
                 }
+            }
 
-                File *copyFile = malloc((sizeof(File)));
-                *copyFile = *currentDir->files[foundIndex];
-                copyFile->id = destDir->nextFileid++;
-
-                currentDir->subdirs[foundDirIndex]->files[destDir->nextFileIndex++] = copyFile;
+            if (replaceIndex >= 0)
+            {
+                currentDir->files[replaceIndex] = copyFile;
+            }
+            else
+            {
+                destDir->files[destDir->nextFileIndex++] = copyFile;
             }
 
             continue;
