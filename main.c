@@ -18,6 +18,25 @@ conteúdo (echo > ou similar), ler conteúdo (cat ou similar), copiar
 internamente na estrutura de dados simulada, não no sistema de
 arquivos real
     3.3. Controle de Acesso e Permissões
+
+    todo arquivo e diretorio pertence a um
+        (owner), grupo (group) e outros (public)
+
+        read, write and execute
+
+        r (4), w (2) e x (1)
+
+        UGO (User, Group, Others)
+
+        chmod u+w arquivo -> adiciona permissao de escrita pro user (u) no arquivo
+        
+
+        chmod 755 pasta ou chmod 644 arquivo.txt
+
+
+        chown: altera o usuário dono e/ou o grupo do item (ex.: sudo chown usuario:grupo arquivo)
+
+
     3.4. Simulação de Alocação de Blocos
 */
 
@@ -29,6 +48,7 @@ arquivos real
 
 char blocks[TOTAL_BLOCKS][BLOCK_SIZE];
 int blockUsed[TOTAL_BLOCKS] = {0};
+#define CURRENT_USER 0 // 0 user, 1 group, 2 other
 
 typedef struct File
 {
@@ -44,6 +64,15 @@ typedef struct File
     time_t modified;
     time_t accessed;
 
+    int permissions[3]; // r, w, x -> chmod numero
+    /*
+        r = 4 (read)
+        w = 2 (write)
+        x = 1 (execute)
+         
+        permissions = [4, 0, 0]
+    */
+
 } File;
 
 typedef struct Dir
@@ -55,6 +84,8 @@ typedef struct Dir
     int nextFileIndex;
     int nextFileid;
     struct Dir *parent;
+
+    int permissions[3]; // r, w, x -> chmod numero
 } Dir;
 
 /*
@@ -105,7 +136,62 @@ File * createFile(char name [10], Dir *dir){
     file->accessed = time(NULL);
     file->id = dir->nextFileid++;
 
+    file->permissions[0] = 0; // r
+    file->permissions[1] = 0; // w
+    file->permissions[2] = 0; // x
+
     return file;
+}
+
+Dir *createDir(char name[10], Dir *dir) {
+    Dir *newDir = (Dir *)malloc(sizeof(Dir)); // alocação dinâmica de memória
+    strcpy(newDir->name, name);
+    newDir->nextDirIndex = 0;
+    newDir->parent = dir;
+    for (int i = 0; i < MAX_SUBDIRS; i++)
+    {
+        newDir->subdirs[i] = NULL;
+    }
+    for (int i = 0; i < MAX_FILES; i++)
+    {
+        newDir->files[i] = NULL;
+    }
+
+    if(dir == NULL){ // root
+        newDir->permissions[0] = 7; // r
+        newDir->permissions[1] = 7; // w
+        newDir->permissions[2] = 7; // x
+    }else{
+        newDir->permissions[0] = 0; // r
+        newDir->permissions[1] = 0; // w
+        newDir->permissions[2] = 0; // x
+    }
+ 
+
+    return newDir;
+}
+
+int hasReadPermission(int permission){
+    if (permission == 4 || permission == 5 || permission == 6 || permission == 7)
+        return 1;
+
+    return 0;
+}
+
+int hasWritePermission(int permission)
+{
+    if (permission == 2 || permission == 6 || permission == 3 || permission == 7)
+        return 1;
+
+    return 0;
+}
+
+int hasExecPermission(int permission)
+{
+    if (permission == 1 || permission == 3 || permission == 5 || permission == 7)
+        return 1;
+
+    return 0;
 }
 
 void addFileToDir(File * file, Dir * dir){
@@ -114,25 +200,7 @@ void addFileToDir(File * file, Dir * dir){
 }
 
 int main() {
-    Dir root;
-    strcpy(root.name, "root");
-    root.parent = NULL;
-
-    for (int i = 0; i < MAX_SUBDIRS; i++)
-    {
-        root.subdirs[i] = NULL;
-    }
-    for (int i = 0; i < MAX_FILES; i++)
-    {
-        root.files[i] = NULL;
-    }
-    root.nextDirIndex = 0;
-    root.nextFileIndex = 0;
-    root.nextFileid = 1;
-    
-    
-    Dir *currentDir = &root;
-
+    Dir *currentDir = createDir("root", NULL);
     char linha[200];
 
     while(1){
@@ -144,14 +212,21 @@ int main() {
              char *nome1 = strtok(NULL, " \t\n");
              char *nome2 = strtok(NULL, " \t\n");
              char *nome3 = strtok(NULL, " \t\n");
-             char *nome4 = strtok(NULL, " \t\n");
 
-             if (comando == NULL)
-             {
+        if (comando == NULL)
+        {
                  continue;
                  // COMANDOS DIRETORIOS
-             } else if (strcmp(comando, "rmdir") == 0 && nome1 != NULL)
+        } else if (strcmp(comando, "rmdir") == 0 && nome1 != NULL)
         {
+            int permission = currentDir->permissions[CURRENT_USER];
+
+            if (!hasWritePermission(permission))
+            {
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
+                continue;
+            }
+
             // procurar diretorio
             int foundIndex = findDir(nome1, currentDir);
 
@@ -184,6 +259,14 @@ int main() {
 
          else if (strcmp(comando, "mkdir") == 0 && nome1 != NULL)
         {
+            int permission = currentDir->permissions[CURRENT_USER];
+
+            if (!hasWritePermission(permission))
+            {
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
+                continue;
+            }
+
             if (currentDir->nextDirIndex >= MAX_SUBDIRS)
             {
                 printf("Diretório cheio. ");
@@ -191,18 +274,7 @@ int main() {
                 continue;
             }
 
-            Dir *newDir = (Dir *)malloc(sizeof(Dir)); // alocação dinâmica de memória
-            strcpy(newDir->name, nome1);
-            newDir->nextDirIndex = 0;
-            newDir->parent = currentDir;
-            for (int i = 0; i < MAX_SUBDIRS; i++)
-            {
-                newDir->subdirs[i] = NULL;
-            }
-            for (int i = 0; i < MAX_FILES; i++)
-            {
-                newDir->files[i] = NULL;
-            }
+            Dir * newDir = createDir(nome1, currentDir);
 
             currentDir->subdirs[currentDir->nextDirIndex] = newDir; // Adiciona o novo diretório à raiz
             currentDir->nextDirIndex++;
@@ -211,6 +283,13 @@ int main() {
 
          else if (strcmp(comando, "ls") == 0)
         {
+            int permission = currentDir->permissions[CURRENT_USER];
+
+            if(!hasReadPermission(permission)){
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
+                continue;
+            }
+
             for (int i = 0; i < MAX_SUBDIRS; i++)
             {
                 if (currentDir->subdirs[i] != NULL)
@@ -363,6 +442,15 @@ int main() {
                     continue;
                 }
 
+                Dir * dir = currentDir->subdirs[foundIndex];
+                int permission = dir->permissions[CURRENT_USER];
+
+                if (!hasExecPermission(permission))
+                {
+                    printf("User %d: Permissao negada.\n", CURRENT_USER);
+                    continue;
+                }
+
                 currentDir = currentDir->subdirs[foundIndex];      
             }
 
@@ -383,7 +471,17 @@ int main() {
                 printf("Arquivo não encontrado.\n");
                 continue;
             }
-            
+
+            //permissoes
+            File *file1 = currentDir->files[foundIndex];
+            int permission = file1->permissions[CURRENT_USER];
+
+            if (hasReadPermission(permission) == 0)
+            {
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
+                continue;
+            }
+
             int foundIndex2 = findFile(nome2, currentDir);
             int foundDirIndex = findDir(nome2, currentDir);
 
@@ -406,6 +504,15 @@ int main() {
 
             if (foundIndex2 == 1) // cp (arquivo) (arquivo existente) -> arquivo 2 vira copia do arquivo1, nomes se mantem
             {
+                File *file2 = currentDir->files[foundIndex2];
+                int permission = file2->permissions[CURRENT_USER];
+
+                if (hasReadPermission(permission) == 0)
+                {
+                    printf("User %d: Permissao negada.\n", CURRENT_USER);
+                    continue;
+                }
+
                 free(currentDir->files[foundIndex2]);
                 
                 File *copyFile = malloc((sizeof(File)));
@@ -437,9 +544,12 @@ int main() {
         }
         // COMANDOS ARQUIVOS
         else if (strcmp(comando, "touch") == 0 && nome1 != NULL){
+            
+            int permission = currentDir->permissions[CURRENT_USER];
 
-            if (strlen(nome1) >= sizeof(((File *)0)->name)) {
-                printf("Nome do arquivo muito longo.\n");
+            if (!hasWritePermission(permission))
+            {
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
                 continue;
             }
 
@@ -447,7 +557,13 @@ int main() {
                 printf("Diretório cheio.\n");
                 continue;
             }
-            
+
+            if (strlen(nome1) >= sizeof(((File *)0)->name))
+            {
+                printf("Nome do arquivo muito longo.\n");
+                continue;
+            }
+
             int foundIndex = findFile(nome1, currentDir);
 
             if(foundIndex > -1){
@@ -466,6 +582,14 @@ int main() {
 
         else if (strcmp(comando, "rm") == 0 && nome1 != NULL)
         {
+            int permission = currentDir->permissions[CURRENT_USER];
+
+            if (!hasWritePermission(permission))
+            {
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
+                continue;
+            }
+
             // procurar arquivo
             int foundIndex = -1;
             for (int i = 0; i < MAX_FILES; i++)
@@ -513,6 +637,14 @@ int main() {
 
             File * file = currentDir->files[foundIndex];
 
+            int permission = file->permissions[CURRENT_USER];
+
+            if (hasReadPermission(permission) == 0)
+            {
+                printf("User %d: Permissao negada.\n", CURRENT_USER);
+                continue;
+            }
+
             printf("%s\n", file->content);
 
             file->accessed = time(NULL);
@@ -543,85 +675,106 @@ int main() {
             }
 
             File *file = NULL;
-            if (foundFileIndex > -1)
-            {
-                file = currentDir->files[foundFileIndex];
-            }
+            
 
-            /* Os blocos atuais do arquivo poderão ser reutilizados. */
-            int available = file != NULL ? file->blockCount : 0;
-            for (int i = 0; i < TOTAL_BLOCKS; i++) {
-                if (blockUsed[i] == 0)
-                    available++;
-            }
-
-            int size = (int)strlen(nome1);
-            printf("Size: %d\n", size);
-            int needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-
-            if (needed > MAX_BLOCKS_PER_FILE ||
-                size >= sizeof(((File *)0)->content))
-            {
-                printf("Conteúdo grande demais.\n");
-                continue;
-            }
-
-            if (available < needed)
-            {
-                printf("Espaço insuficiente nos blocos.\n");
-                continue;
-            }
-
-            /* Se for arquivo novo, verifica capacidade antes de criá-lo. */
-            if (file == NULL)
-            {
-                if (currentDir->nextFileIndex >= MAX_FILES)
+                if (foundFileIndex > -1) // echo "file content" > (arquivo) -> sobrescreve conteudo do arquivo pelo conteudo fornecido
                 {
-                    printf("Diretório cheio.\n");
+                    file = currentDir->files[foundFileIndex];
+                    int permission = file->permissions[CURRENT_USER];
+
+                    if (!hasWritePermission(permission))
+                    {
+                        printf("User %d: Permissao negada.\n", CURRENT_USER);
+                        continue;
+                    }
+
+                    strcpy(currentDir->files[foundFileIndex]->content, nome1);
+                    currentDir->files[foundFileIndex]->modified = time(NULL);
+                }
+
+                /* Os blocos atuais do arquivo poderão ser reutilizados. */
+                int available = file != NULL ? file->blockCount : 0;
+                for (int i = 0; i < TOTAL_BLOCKS; i++)
+                {
+                    if (blockUsed[i] == 0)
+                        available++;
+                }
+
+                int size = (int)strlen(nome1);
+           
+                int needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+
+                if (needed > MAX_BLOCKS_PER_FILE ||
+                    size >= sizeof(((File *)0)->content))
+                {
+                    printf("Conteúdo grande demais.\n");
                     continue;
                 }
 
-                file = createFile(nome3, currentDir);
+                if (available < needed)
+                {
+                    printf("Espaço insuficiente nos blocos.\n");
+                    continue;
+                }
+
+                /* Se for arquivo novo, verifica capacidade antes de criá-lo. */
                 if (file == NULL)
                 {
-                    printf("Não foi possível criar o arquivo.\n");
-                    continue;
+                    int permission = file->permissions[CURRENT_USER];
+
+                    if (!hasWritePermission(permission))
+                    {
+                        printf("User %d: Permissao negada.\n", CURRENT_USER);
+                        continue;
+                    }
+
+                    if (currentDir->nextFileIndex >= MAX_FILES)
+                    {
+                        printf("Diretório cheio.\n");
+                        continue;
+                    }
+
+                    file = createFile(nome3, currentDir);
+                    if (file == NULL)
+                    {
+                        printf("Não foi possível criar o arquivo.\n");
+                        continue;
+                    }
+                    addFileToDir(file, currentDir);
                 }
-                addFileToDir(file, currentDir);
-            }
 
-            /* Libera os blocos antigos para reutilizá-los na nova gravação. */
-            for (int i = 0; i < file->blockCount; i++)
-            {
-                blockUsed[file->blockIndices[i]] = 0;
-            }
-            file->blockCount = 0;
-
-            /* Reserva blocos e grava neles partes do conteúdo. */
-            for (int i = 0; i < TOTAL_BLOCKS && file->blockCount < needed; i++)
-            {
-                if (blockUsed[i] == 0)
+                /* Libera os blocos antigos para reutilizá-los na nova gravação. */
+                for (int i = 0; i < file->blockCount; i++)
                 {
-                    int offset = file->blockCount * BLOCK_SIZE;
-                    int bytes = size - offset;
-
-                    if (bytes > BLOCK_SIZE)
-                        bytes = BLOCK_SIZE;
-
-                    memcpy(blocks[i], nome1 + offset, bytes);
-                    blockUsed[i] = 1;
-                    file->blockIndices[file->blockCount] = i;
-                    file->blockCount++;
+                    blockUsed[file->blockIndices[i]] = 0;
                 }
+                file->blockCount = 0;
+
+                /* Reserva blocos e grava neles partes do conteúdo. */
+                for (int i = 0; i < TOTAL_BLOCKS && file->blockCount < needed; i++)
+                {
+                    if (blockUsed[i] == 0)
+                    {
+                        int offset = file->blockCount * BLOCK_SIZE;
+                        int bytes = size - offset;
+
+                        if (bytes > BLOCK_SIZE)
+                            bytes = BLOCK_SIZE;
+
+                        memcpy(blocks[i], nome1 + offset, bytes);
+                        blockUsed[i] = 1;
+                        file->blockIndices[file->blockCount] = i;
+                        file->blockCount++;
+                    }
+                }
+
+                /* Atualiza os dados do arquivo após concluir a alocação. */
+                strcpy(file->content, nome1);
+                file->size = size;
+                file->modified = time(NULL);
+
+                continue;
             }
-
-            /* Atualiza os dados do arquivo após concluir a alocação. */
-            strcpy(file->content, nome1);
-            file->size = size;
-            file->modified = time(NULL);
-
-            continue;
-        }
         else if (strcmp(comando, "stat") == 0 && nome1 != NULL)
         {
             int foundIndex = findFile(nome1, currentDir);
@@ -637,11 +790,50 @@ int main() {
             printf("Created: %s", ctime(&file->created));
             printf("Modified: %s", ctime(&file->modified));
             printf("Accessed: %s", ctime(&file->accessed));
+            
+            printf("Permissions: ");
+            printf("%d", file->permissions[0]);
+            printf("%d", file->permissions[1]);
+            printf("%d", file->permissions[2]);
+            printf("\n");
+
+            continue;
+        }
+        else if (strcmp(comando, "chmod") == 0 && nome1 != NULL && nome2 != NULL){
+            if (strlen(nome1) != 3)
+            {
+                printf("Comando inválido\n");
+                continue;
+            }
+
+            int foundFileIndex = findFile(nome2, currentDir);
+            int foundDirIndex = findDir(nome2, currentDir);
+
+            if (foundFileIndex == -1 && foundDirIndex == -1)
+            {
+                printf("Arquivo/diretorio não encontrado\n");
+                continue;
+            }
+
+            if(foundFileIndex > -1){
+                currentDir->files[foundFileIndex]->permissions[0] = nome1[0] - '0';
+                currentDir->files[foundFileIndex]->permissions[1] = nome1[1] - '0';
+                currentDir->files[foundFileIndex]->permissions[2] = nome1[2] - '0';
+                continue;
+            }
+            
+            if(foundDirIndex > -1){
+                currentDir->subdirs[foundDirIndex]->permissions[0] = nome1[0] - '0';
+                currentDir->subdirs[foundDirIndex]->permissions[1] = nome1[1] - '0';
+                currentDir->subdirs[foundDirIndex]->permissions[2] = nome1[2] - '0';
+                continue;
+            }
+ 
 
             continue;
         }
 
-    return 0;
+            return 0;
     }
 }
 }
