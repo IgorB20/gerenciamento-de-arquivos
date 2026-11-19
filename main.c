@@ -38,7 +38,7 @@ typedef struct File
     char content[200];
     int size;
     int blockCount;
-    int blockIndices[MAX_BLOCKS_PER_FILE];
+    int blockIndices[MAX_BLOCKS_PER_FILE]; // alocação com indexação simples
 
     time_t created;
     time_t modified;
@@ -529,7 +529,7 @@ int main() {
 
             if (strlen(nome3) >= sizeof(((File *)0)->name))
             {
-                printf("Nome do arquivo muito longo.\n");
+                printf("Conteudo do arquivo muito longo.\n");
                 continue;
             }
 
@@ -543,7 +543,7 @@ int main() {
             }
 
             File *file = NULL;
-            if (foundFileIndex >= 0)
+            if (foundFileIndex > -1)
             {
                 file = currentDir->files[foundFileIndex];
             }
@@ -556,6 +556,7 @@ int main() {
             }
 
             int size = (int)strlen(nome1);
+            printf("Size: %d\n", size);
             int needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
             if (needed > MAX_BLOCKS_PER_FILE ||
