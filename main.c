@@ -591,38 +591,28 @@ int main() {
             }
 
             // procurar arquivo
-            int foundIndex = -1;
-            for (int i = 0; i < MAX_FILES; i++)
-            {
-                if (strcmp(currentDir->files[i]->name, nome1) == 0)
-                {
-                    foundIndex = i;
-                    break;
-                }
-            }
-
+            int foundIndex = findFile(nome1, currentDir);
+            
             if (foundIndex == -1)
             {
                 printf("Arquivo não encontrado.");
                 continue;
             }
 
-            free(currentDir->files[foundIndex]);
-            currentDir->files[foundIndex] = NULL;
+            File *file = currentDir->files[foundIndex];
 
-            if (foundIndex < MAX_FILES - 1)
-            {
-                // todos os indices depois do file encontrado tem que andar 1 pra tras.
-                for (int i = foundIndex + 1; i < MAX_FILES; i++)
-                {
-                    if (currentDir->files[i] == NULL)
-                        break;
-
-                    currentDir->files[i - 1] = currentDir->files[i];
-                    currentDir->files[i] = NULL;
-                }
+            for (int i = 0; i < file->blockCount; i++) {
+                blockUsed[file->blockIndices[i]] = 0;
             }
 
+            free(file);
+
+            // desloca as entradas do array para preencher a posição removida
+            for (int i = foundIndex; i < currentDir->nextFileIndex - 1; i++) {
+                currentDir->files[i] = currentDir->files[i + 1];
+            }
+
+            currentDir->files[currentDir->nextFileIndex - 1] = NULL;
             currentDir->nextFileIndex--;
             continue;
         }
